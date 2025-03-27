@@ -31,7 +31,7 @@ Map<String, dynamic> dummy = {
       "status": "publish",
       "comment_count": 0,
       "like_count": 1,
-      "featured_image": "https://jjj.com/wp-content/uploads/2025/02/smartwatch-phone.jpg",
+      "featured_image":  "https://thefatlossfactorycom.wordpress.com/wp-content/uploads/2025/02/pexels-photo-1092730.jpeg",
       "post_thumbnail": null,
       "format": "standard",
       "publicize_URLs": [],

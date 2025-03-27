@@ -1,182 +1,157 @@
-import 'dart:collection';
 import 'dart:convert';
-import 'dart:io';
+import 'dart:developer';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
+import 'package:html/parser.dart';
+import 'package:http/http.dart';
 import 'package:provider/provider.dart';
-import 'package:od_widget_test/logic/provider/article_provider.dart';
-import 'package:od_widget_test/models/workout_article.dart';
-import 'package:od_widget_test/pages/workout_article_list_page.dart';
-import 'package:od_widget_test/services/article_api_service.dart';
 
-import '../database/article_api_dummy.dart';
-import '../http_override_for_networkimage.dart';
+import '../logic/provider/article_provider.dart';
+import '../models/workout_article.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-@GenerateNiceMocks([
-  MockSpec<ArticleProvider>(),
-  MockSpec<HttpClient>(),
-  MockSpec<HttpClientRequest>(),
-  MockSpec<HttpClientResponse>(),
-  MockSpec<HttpHeaders>(),
-])
+class WorkoutArticleListPage extends StatefulWidget {
+  const WorkoutArticleListPage({super.key});
 
-import 'article_list_page.mocks.dart';
-
-
-
-class MockHttpOverrides extends HttpOverrides {
-  MockHttpClient mockHttpClient;
-  MockHttpOverrides(this.mockHttpClient);
   @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return mockHttpClient;
+  State<WorkoutArticleListPage> createState() => _WorkoutArticleListPageState();
+}
+
+class _WorkoutArticleListPageState extends State<WorkoutArticleListPage> {
+  @override
+  void initState() {
+    super.initState();
+    Provider.of<ArticleProvider>(context, listen: false).getArticles();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Article'),
+      ),
+      body: Consumer<ArticleProvider>(
+        builder: (context, articleProvider, child) {
+          final articles = articleProvider.workoutArticleList;
+
+          if (articles.isEmpty) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16.0),
+            itemCount: articles.length,
+            itemBuilder: (context, index) {
+              final article = articles[index];
+
+              return Card(
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(15),
+                  onTap: () {
+                    //이동 action 처리
+                    final url = article.postURL;
+
+                    if (url.isNotEmpty) {
+                      launchUrl(Uri.parse(article.postURL));
+                    }
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(15)),
+                        child: Image.network(
+                          article.thumbnailURL,
+                          height: 180,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) {
+                            return Image.asset(
+                              'assets/me.jpg',
+                              height: 180,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                            );
+                          },
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                CircleAvatar(
+                                  backgroundImage: NetworkImage(article.avatarURL),
+                                  radius: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    article.authorName,
+                                    style: Theme.of(context).textTheme.bodySmall,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                Text(
+                                  '${article.postDate.year}-${article.postDate.month.toString().padLeft(2, '0')}-${article.postDate.day.toString().padLeft(2, '0')} ',
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.grey),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              article.postTitle,
+                              style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              parse(article.postExcerpt).documentElement?.text ?? '',
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium,
+                            ),
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 5.0,
+                              runSpacing: -8.0,
+                              children: article.postTag
+                                  .take(3)
+                                  .map(
+                                    (tag) => Chip(
+                                      label: Text(
+                                        tag,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: Theme.of(context).colorScheme.onSecondary,
+                                        ),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      backgroundColor: Theme.of(context).colorScheme.secondary,
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
   }
 }
-
-// 예시로 1x1 투명 PNG 데이터를 반환합니다.
-final List<int> fakeImageData = <int>[
-  137, 80, 78, 71, 13, 10, 26, 10, // PNG signature
-  0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0,
-  31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84, 120, 156, 99, 0,
-  1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69, 78, 68,
-  174, 66, 96, 130,
-];
-final fakeResponseBody = utf8.encode(
-  jsonEncode(
-    {
-      "imageName": "sample.png",
-      "imageData": fakeImageData,
-    },
-  ),
-);
-
-
-
-void main() {
-  late MockHttpClient mockHttpClient;
-  late MockHttpClientRequest request;
-  late MockHttpClientResponse response;
-  late MockArticleProvider mockArticleProvider;
-
-  tearDown(() {
-    mockHttpClient.close();
-    request.close();
-
-    HttpOverrides.global = null;
-  });
-
-  setUp(() {
-    mockHttpClient = MockHttpClient();
-    HttpOverrides.global =MockHttpOverrides(mockHttpClient);
-    request = MockHttpClientRequest();
-    response = MockHttpClientResponse();
-
-
-    mockArticleProvider = MockArticleProvider();
-    final dummyArticles = List.generate(
-      10,
-          (index) {
-        int i = index % 2;
-        return WorkoutArticle.fromMap(dummy['posts'][i]);
-      },
-    );
-
-    when(mockArticleProvider.workoutArticleList).thenReturn(dummyArticles);
-
-
-    when(mockHttpClient.getUrl(any)).thenAnswer((invocation) {
-      //success 상황 mocking
-      when(response.statusCode).thenReturn(400);
-      when(request.close()).thenAnswer((_) async => response);
-      // when(request.addStream(any)).thenAnswer((_) async => null);
-      // when(response.headers).thenReturn(MockHttpHeaders());
-      // when(response.handleError(any, test: anyNamed('test'))).thenAnswer((_) => Stream.value(body));
-      // when(response.reasonPhrase).thenReturn('OK');
-      // when(response.contentLength).thenReturn(body.length);
-      // when(response.isRedirect).thenReturn(false);
-      // when(response.persistentConnection).thenReturn(false);
-
-      return Future.value(request);
-    });
-
-
-  });
-  // setUp(() {
-  //
-  // });
-
-  group("Image Widget 동작 검증", () {
-
-
-    testWidgets('NetworkImage 성공', (WidgetTester tester) async {
-
-
-      await tester.pumpWidget(
-        MultiProvider(
-          providers: [
-            ChangeNotifierProvider<ArticleProvider>(
-              create: (_) => mockArticleProvider,
-            ),
-          ],
-          child: MaterialApp(
-            home: WorkoutArticleListPage(),
-          ),
-        ),
-      );
-      // 네트워크 호출 후 이미지가 로드될 시간을 줌
-      await tester.pumpAndSettle();
-
-      // Card 위젯이 화면에 있는지 확인
-      expect(find.byType(Card), findsNWidgets(10));
-
-      //NetworkImage가 잘 나오는지 확인,
-      expect(
-        find.byWidgetPredicate(
-              (widget) => widget is Image && widget.image is NetworkImage,
-        ),
-        findsNWidgets(10),
-      );
-    });
-
-
-
-
-    // testWidgets('NetworkImage 실패, ErrorBuilder', (WidgetTester tester) async {
-    //
-    //   when(mockHttpClient.getUrl(any)).thenAnswer((invocation) {
-    //     when(response.statusCode).thenReturn(404);
-    //     when(request.close()).thenAnswer((_) async => response);
-    //     return Future.value(request);
-    //   });
-    //   await tester.pumpWidget(
-    //     MultiProvider(
-    //       providers: [
-    //         ChangeNotifierProvider<ArticleProvider>(
-    //           create: (_) => mockArticleProvider,
-    //         ),
-    //       ],
-    //       child: MaterialApp(
-    //         home: WorkoutArticleListPage(),
-    //       ),
-    //     ),
-    //   );
-    //   // 네트워크 호출 후 이미지가 로드될 시간을 줌
-    //   await tester.pumpAndSettle();
-    //
-    //   //AssetImage 잘 나오는지 확인,
-    //   expect(
-    //     find.byWidgetPredicate(
-    //           (widget) => widget is Image && widget.image is AssetImage,
-    //     ),
-    //     findsNWidgets(10),
-    //   );
-    // });
-  });
-}
-
-
-
