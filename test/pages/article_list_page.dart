@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:html/parser.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
@@ -55,28 +56,34 @@ void main() {
 
   late MockArticleProvider mockArticleProvider;
   late List<WorkoutArticle> dummyArticles;
-  MockImageHttpClient mockImageHttpClient=MockImageHttpClient();
+  late MockImageHttpClient mockImageHttpClient;
 
-  setUp(() {
+  setUpAll(() {
+    mockImageHttpClient=MockImageHttpClient();
+    HttpOverrides.global =MockHttpOverrides(mockImageHttpClient.client);
+
     mockArticleProvider = MockArticleProvider();
     dummyArticles = List.generate(10, (index) => WorkoutArticle.fromMap(dummy['posts'][0]));
-
-    HttpOverrides.global =MockHttpOverrides(mockImageHttpClient.client);
   });
 
+  tearDown((){
+    imageCache.clear();
+  });
 
   testWidgets('ListView widget이 잘 나타나는지 확인', (WidgetTester tester) async {
     when(mockArticleProvider.workoutArticleList).thenReturn(dummyArticles);
     await tester.pumpWidget(
-      ChangeNotifierProvider<ArticleProvider>(
-        create: (_) => mockArticleProvider,
-        child: MaterialApp(
-          home: WorkoutArticleListPage(),
-        ),
-      ),
+        ChangeNotifierProvider<ArticleProvider>(
+          create: (_) => mockArticleProvider,
+          child: MaterialApp(
+            home: WorkoutArticleListPage(),
+          ),
+        )
     );
     await tester.pumpAndSettle();
+
     expect(find.byType(ListView), findsOneWidget);
+
   });
 
   testWidgets('Thumbnail image가  잘 나오는지 확인', (WidgetTester tester) async {
@@ -226,7 +233,7 @@ void main() {
       mockUrlLauncherPlatform.launchUrl(dummyArticles.first.postURL,any),
     ).called(1);
   });
-
+  //
   testWidgets('ListView scroll 확인', (WidgetTester tester) async {
     List<WorkoutArticle> longTitleDummyArticles=[...dummyArticles];
     when(mockArticleProvider.workoutArticleList).thenAnswer((_){
@@ -251,7 +258,6 @@ void main() {
     final titleFinder = find.text(longTitleDummyArticles[2].postTitle);
     expect(titleFinder, findsOneWidget);
   });
-
   testWidgets('Thumbnail image가 없을시 default image가 잘 나오는지 확인', (WidgetTester tester) async {
     when(mockArticleProvider.workoutArticleList).thenReturn(dummyArticles);
     when(mockImageHttpClient.client.getUrl(Uri.parse(
@@ -314,8 +320,6 @@ void main() {
     await tester.pumpAndSettle();
     final TestGesture gesture = await tester.startGesture(const Offset(0.0, 500.0));
     await gesture.moveBy(const Offset(0.0, -5000));
-
-
     await tester.pumpAndSettle();
     final titleFinder = find.text(longTitleDummyArticles[9].postTitle);
     expect(titleFinder, findsOneWidget);
